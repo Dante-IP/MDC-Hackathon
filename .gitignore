@@ -141,3 +141,11 @@ vite.config.ts.timestamp-*
 
 #deployment (not required)
 .vercel
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
