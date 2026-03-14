@@ -149,3 +149,6 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+#data
+.data/
