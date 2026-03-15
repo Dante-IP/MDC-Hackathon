@@ -15,225 +15,182 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState('')
 
-  useEffect(() => {
-    if (status === 'unauthenticated') router.push('/')
-  }, [status, router])
-
-  useEffect(() => {
-    if (session) loadCachedEmails()
-  }, [session])
+  useEffect(() => { if (status === 'unauthenticated') router.push('/') }, [status, router])
+  useEffect(() => { if (session) loadCachedEmails() }, [session])
 
   async function loadCachedEmails() {
     setLoading(true)
     try {
       const res = await fetch('/api/emails')
       const data = await res.json()
-      if (data.emails) {
-        setEmails(data.emails)
-        setLastFetched(data.lastFetched)
-      }
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setLoading(false)
-    }
+      if (data.emails) { setEmails(data.emails); setLastFetched(data.lastFetched) }
+    } catch (e) { console.error(e) }
+    finally { setLoading(false) }
   }
 
   async function fetchAndCategorize() {
-    setFetching(true)
-    setError(null)
-    setProgress('Connecting to Gmail...')
+    setFetching(true); setError(null); setProgress('Connecting to Gmail...')
     try {
-      setProgress('Fetching emails...')
+      setProgress('Fetching & categorizing with AI...')
       const res = await fetch('/api/emails', { method: 'POST' })
-      setProgress('AI is categorizing...')
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to fetch emails')
-      setEmails(data.emails || [])
-      setLastFetched(Date.now())
-      setProgress('')
-    } catch (e: any) {
-      setError(e.message)
-      setProgress('')
-    } finally {
-      setFetching(false)
-    }
+      setEmails(data.emails || []); setLastFetched(Date.now()); setProgress('')
+    } catch (e: any) { setError(e.message); setProgress('') }
+    finally { setFetching(false) }
   }
 
-  const countByCategory = (cat: EmailCategory) =>
-    emails.filter((e) => e.category === cat).length
-
+  const countByCategory = (cat: EmailCategory) => emails.filter((e) => e.category === cat).length
   const totalEmails = emails.length
 
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen bg-paper flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-muted text-sm">Loading your inbox…</p>
-        </div>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', zIndex: 1 }}>
+        <div style={{ width: 28, height: 28, border: '2px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-paper">
-      {/* Top Nav */}
-      <nav className="border-b border-ink/8 bg-paper/80 backdrop-blur-sm sticky top-0 z-20">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">📬</span>
-            <span className="font-display font-bold text-lg text-ink">InboxIQ</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted hidden sm:block">
-              {session?.user?.email}
-            </span>
-            <img
-              src={session?.user?.image || ''}
-              alt="avatar"
-              className="w-7 h-7 rounded-full border border-ink/10"
-            />
-            <button
-              onClick={() => signOut({ callbackUrl: '/' })}
-              className="text-sm text-muted hover:text-ink transition-colors"
-            >
-              Sign out
-            </button>
+    <div style={{ position: 'relative', zIndex: 1, minHeight: '100vh', display: 'grid', gridTemplateColumns: '280px 1fr' }}>
+
+      {/* Sidebar */}
+      <aside style={{ position: 'sticky', top: 0, height: '100vh', overflowY: 'auto', padding: '28px 20px', display: 'flex', flexDirection: 'column', gap: 20, borderRight: '1px solid var(--border)', background: 'rgba(8,11,18,0.7)', backdropFilter: 'blur(20px)' }}>
+        {/* Brand */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, borderRadius: 'var(--radius)', background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, var(--accent), var(--accent-2))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0, boxShadow: '0 4px 16px var(--accent-glow)' }}>✉</div>
+          <div>
+            <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 20, fontWeight: 800, color: 'var(--text)' }}>InboxIQ</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>AI Gmail Organizer</div>
           </div>
         </div>
-      </nav>
 
-      <main className="max-w-6xl mx-auto px-6 py-10">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-10">
-          <div>
-            <h1 className="font-display text-4xl font-bold text-ink mb-1">
-              Your Inbox
-            </h1>
-            <p className="text-muted text-sm">
-              {totalEmails > 0
-                ? `${totalEmails} emails sorted across ${CATEGORIES.length} categories`
-                : 'Connect your Gmail to get started'}
-            </p>
-            {lastFetched && (
-              <p className="text-xs text-muted/70 mt-1">
-                Last synced: {new Date(lastFetched).toLocaleString()}
-              </p>
-            )}
-          </div>
+        {/* Smart Labels */}
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--text-dim)', padding: '0 4px' }}>Smart Labels</div>
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {CATEGORIES.map((cat) => {
+            const count = countByCategory(cat)
+            return (
+              <Link key={cat} href={`/category/${encodeURIComponent(cat)}`}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', textDecoration: 'none', color: 'var(--text-muted)', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid transparent', transition: 'all 0.18s ease' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text)'; (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)' }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.borderColor = 'transparent' }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 16, width: 20, textAlign: 'center' as const }}>{CATEGORY_META[cat].icon}</span>
+                  <span style={{ fontSize: 14, fontWeight: 500 }}>{cat}</span>
+                </span>
+                <span style={{ background: 'var(--surface-3)', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: 999, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>{count}</span>
+              </Link>
+            )
+          })}
+        </nav>
 
-          <button
-            onClick={fetchAndCategorize}
-            disabled={fetching}
-            className="inline-flex items-center gap-2 bg-accent text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-accent/90 transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-lg shadow-accent/25 hover:scale-105 active:scale-95"
-          >
-            {fetching ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                {progress || 'Working…'}
-              </>
-            ) : (
-              <>
-                <span>↻</span>
-                {totalEmails > 0 ? 'Re-sync Emails' : 'Fetch & Categorize Emails'}
-              </>
-            )}
+        {/* About */}
+        <div style={{ padding: 16, borderRadius: 'var(--radius)', background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+          <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--text-muted)', marginBottom: 10 }}>About</div>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.7 }}>University students miss internships, research, and campus resources because important emails get buried. InboxIQ surfaces what matters most.</p>
+        </div>
+
+        {/* Actions */}
+        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button onClick={fetchAndCategorize} disabled={fetching}
+            style={{ width: '100%', border: 'none', background: 'linear-gradient(135deg, var(--accent), #c2185b)', color: 'white', padding: '11px 16px', borderRadius: 'var(--radius-sm)', fontSize: 14, fontWeight: 700, cursor: fetching ? 'not-allowed' : 'pointer', opacity: fetching ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 20px var(--accent-glow)' }}>
+            {fetching
+              ? <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />{progress || 'Working…'}</>
+              : <>{totalEmails > 0 ? '↻ Re-sync' : '✦ Fetch & Categorize'}</>}
+          </button>
+          <button onClick={() => signOut({ callbackUrl: '/' })}
+            style={{ width: '100%', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', padding: '10px 16px', borderRadius: 'var(--radius-sm)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
+            Sign out
           </button>
         </div>
+      </aside>
 
-        {/* Error */}
+      {/* Main */}
+      <main style={{ padding: 32, display: 'flex', flexDirection: 'column', gap: 28, maxWidth: 1200 }}>
+        {/* Hero */}
+        <section style={{ padding: '36px 40px', borderRadius: 'var(--radius-lg)', background: 'var(--surface)', border: '1px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: -60, right: -60, width: 300, height: 300, borderRadius: '50%', background: 'radial-gradient(circle, var(--accent-glow) 0%, transparent 70%)', pointerEvents: 'none' }} />
+          <div style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 12px', borderRadius: 999, background: 'rgba(230,63,107,0.12)', border: '1px solid rgba(230,63,107,0.25)', color: 'var(--accent)', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: 16 }}>Hackathon MVP</div>
+          <h2 style={{ fontFamily: 'Syne, sans-serif', fontSize: 42, fontWeight: 800, lineHeight: 1.08, color: 'var(--text)', maxWidth: 700 }}>Organize your inbox instantly</h2>
+          <p style={{ marginTop: 12, color: 'var(--text-muted)', fontSize: 16, lineHeight: 1.75, maxWidth: 600 }}>
+            {totalEmails > 0
+              ? `${totalEmails} emails sorted across ${CATEGORIES.length} smart labels. Click a category to explore.`
+              : 'AI groups emails into useful labels — then helps you decide what deserves attention first.'}
+          </p>
+
+          {totalEmails > 0 && (
+            <div style={{ marginTop: 28, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+              {[
+                { n: totalEmails, l: 'Emails scanned' },
+                { n: CATEGORIES.length, l: 'Smart labels' },
+                { n: emails.filter(e => e.category !== 'Other').length, l: 'Opportunities found' },
+              ].map((s) => (
+                <div key={s.l} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 20, textAlign: 'center' as const }}>
+                  <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 36, fontWeight: 800, color: 'var(--blue)', lineHeight: 1 }}>{s.n}</div>
+                  <div style={{ marginTop: 6, color: 'var(--text-muted)', fontSize: 12, fontWeight: 500, letterSpacing: '0.04em' }}>{s.l}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-            ⚠️ {error}
-          </div>
+          <div style={{ background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: 'var(--radius)', padding: '14px 18px', color: '#fca5a5', fontSize: 14 }}>⚠️ {error}</div>
         )}
 
-        {/* Empty state */}
         {totalEmails === 0 && !fetching && (
-          <div className="text-center py-20 border-2 border-dashed border-ink/10 rounded-2xl">
-            <div className="text-5xl mb-4">📭</div>
-            <h3 className="font-display text-xl font-semibold text-ink mb-2">
-              No emails loaded yet
-            </h3>
-            <p className="text-muted text-sm mb-6">
-              Click "Fetch & Categorize Emails" to connect your Gmail and let AI organize everything.
-            </p>
-          </div>
+          <section style={{ padding: '60px 40px', borderRadius: 'var(--radius-lg)', background: 'var(--surface)', border: '1px dashed var(--border)', textAlign: 'center' as const }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>📭</div>
+            <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: 22, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>No emails loaded yet</h3>
+            <p style={{ color: 'var(--text-muted)', lineHeight: 1.7, maxWidth: 400, margin: '0 auto' }}>Click "Fetch & Categorize" to connect your Gmail and let AI sort everything.</p>
+          </section>
         )}
 
-        {/* Category Cards Grid */}
         {totalEmails > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {CATEGORIES.map((cat, i) => {
-              const meta = CATEGORY_META[cat]
-              const count = countByCategory(cat)
-              return (
-                <Link
-                  key={cat}
-                  href={`/category/${encodeURIComponent(cat)}`}
-                  className={`group relative p-6 rounded-2xl border ${meta.border} ${meta.bg} hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 cursor-pointer animate-fade-up`}
-                  style={{ animationDelay: `${i * 80}ms`, animationFillMode: 'both' }}
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <span className="text-3xl">{meta.icon}</span>
-                    <span
-                      className={`text-3xl font-display font-bold ${meta.color}`}
-                    >
-                      {count}
-                    </span>
-                  </div>
-                  <h3 className={`font-semibold text-base ${meta.color} mb-1`}>{cat}</h3>
-                  <p className="text-xs text-muted leading-relaxed">{meta.description}</p>
-                  <div className={`mt-4 text-xs font-medium ${meta.color} opacity-0 group-hover:opacity-100 transition-opacity`}>
-                    View all →
-                  </div>
-                  {count === 0 && (
-                    <div className="absolute inset-0 rounded-2xl bg-paper/50 flex items-center justify-center">
-                      <span className="text-xs text-muted">No emails</span>
-                    </div>
-                  )}
-                </Link>
-              )
-            })}
-          </div>
-        )}
+          <>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>Dashboard</h3>
+              <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.6 }}>Click a category to view emails, AI summaries, and a synthesis bar with citations.</p>
+            </div>
 
-        {/* Recent Activity strip */}
-        {totalEmails > 0 && (
-          <div className="mt-10">
-            <h2 className="font-display text-xl font-semibold text-ink mb-4">
-              Recent Emails
-            </h2>
-            <div className="space-y-2">
-              {emails.slice(0, 5).map((email) => {
-                const meta = CATEGORY_META[email.category]
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(280px,1fr))', gap: 20 }}>
+              {CATEGORIES.map((cat) => {
+                const meta = CATEGORY_META[cat]
+                const count = countByCategory(cat)
+                const topEmail = emails.find((e) => e.category === cat)
                 return (
-                  <Link
-                    key={email.id}
-                    href={`/email/${email.id}`}
-                    className="flex items-center gap-4 p-4 bg-paper-warm border border-ink/6 rounded-xl hover:border-ink/15 hover:shadow-sm transition-all group"
+                  <Link key={cat} href={`/category/${encodeURIComponent(cat)}`}
+                    style={{ textDecoration: 'none', color: 'inherit', display: 'block', padding: '22px 24px', borderRadius: 'var(--radius-lg)', background: 'var(--surface)', border: '1px solid var(--border)', transition: 'all 0.18s ease', position: 'relative', overflow: 'hidden' }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-hover)'; (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-md)' }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}
                   >
-                    <span className="text-xl shrink-0">{meta.icon}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-sm font-medium text-ink truncate">
-                          {email.subject}
-                        </span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${meta.bg} ${meta.color} border ${meta.border} shrink-0`}>
-                          {email.category}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted truncate">{email.summary}</p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 48, height: 48, borderRadius: 14, background: 'var(--surface-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>{meta.icon}</div>
+                      <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: 999, padding: '6px 12px', fontSize: 12, fontWeight: 600 }}>{count} email{count !== 1 ? 's' : ''}</div>
                     </div>
-                    <span className="text-xs text-muted shrink-0 hidden sm:block">
-                      {new Date(email.date).toLocaleDateString()}
-                    </span>
+                    <h4 style={{ fontFamily: 'Syne, sans-serif', fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: '16px 0 8px' }}>{cat}</h4>
+                    <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.65, margin: 0 }}>{meta.description}</p>
+                    {topEmail && (
+                      <div style={{ marginTop: 16, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 14 }}>
+                        <div style={{ fontSize: 10, textTransform: 'uppercase' as const, fontWeight: 700, color: 'var(--text-dim)', letterSpacing: '0.1em', marginBottom: 6 }}>Top pick</div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', lineHeight: 1.4 }}>{topEmail.subject}</div>
+                        <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text-muted)' }}>{topEmail.sender.split('<')[0].trim()}</div>
+                      </div>
+                    )}
+                    <div style={{ marginTop: 14, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '10px 14px', fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+                      {topEmail?.summary || meta.description}
+                    </div>
                   </Link>
                 )
               })}
             </div>
-          </div>
+          </>
+        )}
+
+        {lastFetched && (
+          <p style={{ fontSize: 12, color: 'var(--text-dim)', textAlign: 'center' as const }}>Last synced: {new Date(lastFetched).toLocaleString()}</p>
         )}
       </main>
     </div>

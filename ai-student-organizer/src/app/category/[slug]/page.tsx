@@ -2,13 +2,10 @@
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
 import { useEffect, useState, useRef } from 'react'
-import { CategorizedEmail, EmailCategory, CATEGORY_META } from '@/lib/types'
+import { CategorizedEmail, EmailCategory, CATEGORIES, CATEGORY_META } from '@/lib/types'
 import Link from 'next/link'
 
-interface ChatMessage {
-  role: 'user' | 'assistant'
-  content: string
-}
+interface ChatMessage { role: 'user' | 'assistant'; content: string }
 
 export default function CategoryPage() {
   const { data: session, status } = useSession()
@@ -22,45 +19,31 @@ export default function CategoryPage() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
+  const [panelVisible, setPanelVisible] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    if (status === 'unauthenticated') router.push('/')
-  }, [status, router])
-
-  useEffect(() => {
-    if (session) loadEmails()
-  }, [session])
-
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [chatMessages])
+  useEffect(() => { if (status === 'unauthenticated') router.push('/') }, [status, router])
+  useEffect(() => { if (session) loadEmails() }, [session])
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chatMessages])
 
   async function loadEmails() {
     try {
       const res = await fetch('/api/emails')
       const data = await res.json()
-      const filtered = (data.emails || []).filter(
-        (e: CategorizedEmail) => e.category === category
-      )
-      setEmails(filtered)
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setLoading(false)
-    }
+      setEmails((data.emails || []).filter((e: CategorizedEmail) => e.category === category))
+    } catch (e) { console.error(e) }
+    finally { setLoading(false) }
   }
 
   async function sendChat(e: React.FormEvent) {
     e.preventDefault()
     if (!chatInput.trim() || chatLoading) return
-
     const question = chatInput.trim()
     setChatInput('')
     setChatMessages((prev) => [...prev, { role: 'user', content: question }])
     setChatLoading(true)
-
+    setPanelVisible(true)
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -68,218 +51,150 @@ export default function CategoryPage() {
         body: JSON.stringify({ question, category }),
       })
       const data = await res.json()
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: data.answer || data.error || 'No response.',
-        },
-      ])
+      setChatMessages((prev) => [...prev, { role: 'assistant', content: data.answer || data.error || 'No response.' }])
     } catch {
-      setChatMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: 'Something went wrong. Please try again.' },
-      ])
+      setChatMessages((prev) => [...prev, { role: 'assistant', content: 'Something went wrong. Please try again.' }])
     } finally {
       setChatLoading(false)
       inputRef.current?.focus()
     }
   }
 
-  const suggestions = [
-    'What deadlines are coming up?',
-    'Summarize all emails here',
-    'Which ones need an application?',
-    'Most important ones?',
-  ]
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-paper flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', zIndex: 1 }}>
+        <div style={{ width: 28, height: 28, border: '2px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
       </div>
     )
   }
 
   return (
-    <div className="h-screen bg-paper flex flex-col overflow-hidden">
+    <div style={{ position: 'relative', zIndex: 1, minHeight: '100vh', display: 'grid', gridTemplateColumns: '280px 1fr' }}>
 
-      {/* Header */}
-      <header className="border-b border-ink/8 bg-paper/90 backdrop-blur-sm z-30 shrink-0">
-        <div className="max-w-3xl mx-auto px-6 h-14 flex items-center gap-4">
-          <Link
-            href="/dashboard"
-            className="text-muted hover:text-ink transition-colors text-sm"
-          >
-            ← Dashboard
-          </Link>
-          <div className="h-4 w-px bg-ink/10" />
-          <span className="text-lg">{meta.icon}</span>
-          <h1 className={`font-display font-bold text-lg ${meta.color}`}>
-            {category}
-          </h1>
-          <span
-            className={`text-xs px-2 py-0.5 rounded-full ${meta.bg} ${meta.color} border ${meta.border} font-medium ml-auto`}
-          >
-            {emails.length} email{emails.length !== 1 ? 's' : ''}
-          </span>
-        </div>
-      </header>
+      {/* Sidebar */}
+      <aside style={{ position: 'sticky', top: 0, height: '100vh', overflowY: 'auto', padding: '28px 20px', display: 'flex', flexDirection: 'column', gap: 20, borderRight: '1px solid var(--border)', background: 'rgba(8,11,18,0.7)', backdropFilter: 'blur(20px)' }}>
+        <Link href="/dashboard" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none', color: 'var(--text-muted)', fontSize: 13, fontWeight: 500, padding: '8px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', width: 'fit-content', transition: 'all 0.2s' }}>
+          ← Dashboard
+        </Link>
 
-      {/* Scrollable content area — emails + chat output */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-6 py-6 pb-52">
-
-          {/* Email list */}
-          {emails.length === 0 ? (
-            <div className="text-center py-20 border-2 border-dashed border-ink/10 rounded-2xl">
-              <div className="text-4xl mb-3">{meta.icon}</div>
-              <p className="text-muted text-sm">No emails in this category yet.</p>
-              <Link
-                href="/dashboard"
-                className="mt-4 inline-block text-sm text-accent hover:underline"
-              >
-                ← Back to dashboard
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {emails.map((email, i) => (
-                <Link
-                  key={email.id}
-                  href={`/email/${email.id}`}
-                  className={`block p-5 rounded-xl border ${meta.border} ${meta.bg} hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 animate-fade-up`}
-                  style={{ animationDelay: `${i * 40}ms`, animationFillMode: 'both' }}
-                >
-                  <div className="flex items-start justify-between gap-4 mb-1.5">
-                    <h3 className="font-semibold text-ink text-sm leading-snug line-clamp-2">
-                      {email.subject}
-                    </h3>
-                    <span className="text-xs text-muted shrink-0">
-                      {new Date(email.date).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted mb-2 truncate">{email.sender}</p>
-                  <p className="text-sm text-ink/70 leading-relaxed line-clamp-2">
-                    {email.summary}
-                  </p>
-                </Link>
-              ))}
-            </div>
-          )}
-
-          {/* Chat messages — appear below emails */}
-          {chatMessages.length > 0 && (
-            <div className="mt-6 space-y-3">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="h-px flex-1 bg-ink/8" />
-                <span className="text-xs text-muted px-2">AI Chat</span>
-                <div className="h-px flex-1 bg-ink/8" />
-              </div>
-              {chatMessages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-up`}
-                  style={{ animationFillMode: 'both' }}
-                >
-                  <div
-                    className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
-                      msg.role === 'user'
-                        ? 'bg-accent text-white rounded-br-sm'
-                        : `bg-paper border border-ink/10 text-ink rounded-bl-sm shadow-sm`
-                    }`}
-                  >
-                    {msg.content}
-                  </div>
-                </div>
-              ))}
-              {chatLoading && (
-                <div className="flex justify-start">
-                  <div className="bg-paper border border-ink/10 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
-                    <div className="flex gap-1 items-center h-4">
-                      <div
-                        className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce"
-                        style={{ animationDelay: '0ms' }}
-                      />
-                      <div
-                        className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce"
-                        style={{ animationDelay: '150ms' }}
-                      />
-                      <div
-                        className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce"
-                        style={{ animationDelay: '300ms' }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-              <div ref={chatEndRef} />
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Fixed bottom prompt bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 pointer-events-none">
-        {/* Gradient fade */}
-        <div className="h-16 bg-gradient-to-t from-paper to-transparent" />
-
-        {/* Prompt area */}
-        <div className="bg-paper pb-6 pt-2 pointer-events-auto">
-          <div className="max-w-3xl mx-auto px-6">
-
-            {/* Suggestion chips — only before first message */}
-            {chatMessages.length === 0 && (
-              <div className="flex gap-2 mb-3 flex-wrap justify-center">
-                {suggestions.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => {
-                      setChatInput(s)
-                      inputRef.current?.focus()
-                    }}
-                    className="text-xs px-3 py-1.5 rounded-full bg-paper-warm border border-ink/10 text-muted hover:text-ink hover:border-ink/20 transition-all"
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Input bar */}
-            <form
-              onSubmit={sendChat}
-              className="flex items-center gap-3 bg-paper-warm border border-ink/15 rounded-2xl px-4 py-3 shadow-lg shadow-ink/8 focus-within:border-accent/40 focus-within:ring-2 focus-within:ring-accent/10 transition-all"
-            >
-              <input
-                ref={inputRef}
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder={`Ask about your ${category.toLowerCase()} emails…`}
-                disabled={chatLoading}
-                className="flex-1 text-sm bg-transparent focus:outline-none placeholder:text-muted/50 text-ink disabled:opacity-50"
-              />
-              {chatLoading ? (
-                <div className="w-8 h-8 flex items-center justify-center shrink-0">
-                  <div className="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
-                </div>
-              ) : (
-                <button
-                  type="submit"
-                  disabled={!chatInput.trim()}
-                  className="w-8 h-8 bg-accent text-white rounded-xl flex items-center justify-center hover:bg-accent/90 transition-all disabled:opacity-30 disabled:cursor-not-allowed shrink-0 text-sm font-bold hover:scale-105 active:scale-95"
-                >
-                  ↑
-                </button>
-              )}
-            </form>
-
-            <p className="text-center text-xs text-muted/40 mt-2">
-              AI has context of all {emails.length} emails in this category
-            </p>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: 16, borderRadius: 'var(--radius)', background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, var(--accent), var(--accent-2))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0, boxShadow: '0 4px 16px var(--accent-glow)' }}>{meta.icon}</div>
+          <div>
+            <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 20, fontWeight: 800, color: 'var(--text)' }}>{category}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3, lineHeight: 1.4 }}>{meta.description}</div>
           </div>
         </div>
+
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--text-dim)', padding: '0 4px' }}>Other Labels</div>
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {CATEGORIES.map((cat) => (
+            <Link key={cat} href={`/category/${encodeURIComponent(cat)}`}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', textDecoration: 'none', padding: '10px 12px', borderRadius: 'var(--radius-sm)', border: `1px solid ${cat === category ? 'var(--border-hover)' : 'transparent'}`, background: cat === category ? 'var(--surface-3)' : 'transparent', color: cat === category ? 'var(--text)' : 'var(--text-muted)', transition: 'all 0.18s ease' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 16, width: 20, textAlign: 'center' as const }}>{CATEGORY_META[cat].icon}</span>
+                <span style={{ fontSize: 14, fontWeight: cat === category ? 600 : 500 }}>{cat}</span>
+              </span>
+            </Link>
+          ))}
+        </nav>
+      </aside>
+
+      {/* Main — scrollable, padded for floating bar */}
+      <main style={{ padding: 32, paddingBottom: 120, display: 'flex', flexDirection: 'column', gap: 28, maxWidth: 1200 }}>
+        {/* Hero */}
+        <section style={{ padding: '28px 32px', borderRadius: 'var(--radius-lg)', background: 'var(--surface)', border: '1px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: -60, right: -60, width: 300, height: 300, borderRadius: '50%', background: 'radial-gradient(circle, var(--accent-glow) 0%, transparent 70%)', pointerEvents: 'none' }} />
+          <div style={{ display: 'inline-flex', padding: '5px 12px', borderRadius: 999, background: 'rgba(230,63,107,0.12)', border: '1px solid rgba(230,63,107,0.25)', color: 'var(--accent)', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: 16 }}>Category View</div>
+          <h2 style={{ fontFamily: 'Syne, sans-serif', fontSize: 30, fontWeight: 800, lineHeight: 1.08, color: 'var(--text)' }}>{category} Inbox</h2>
+          <p style={{ marginTop: 12, color: 'var(--text-muted)', fontSize: 16, lineHeight: 1.75 }}>
+            {emails.length} email{emails.length !== 1 ? 's' : ''} sorted. Click any to open the full message.
+          </p>
+        </section>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>Emails</h3>
+          <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.6 }}>Click to open the full message.</p>
+        </div>
+
+        {emails.length === 0 ? (
+          <div style={{ padding: '60px 40px', borderRadius: 'var(--radius-lg)', background: 'var(--surface)', border: '1px dashed var(--border)', textAlign: 'center' as const }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>{meta.icon}</div>
+            <p style={{ color: 'var(--text-muted)' }}>No emails in this category yet.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {emails.map((email) => (
+              <Link key={email.id} href={`/email/${email.id}`}
+                style={{ textDecoration: 'none', color: 'inherit', display: 'block', padding: '20px 24px', borderRadius: 'var(--radius-lg)', background: 'var(--surface)', border: '1px solid var(--border)', transition: 'all 0.18s ease' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-hover)'; (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-md)' }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text)' }}>{email.sender.split('<')[0].trim()}</div>
+                    <div style={{ marginTop: 3, color: 'var(--text-muted)', fontSize: 12 }}>{email.sender.match(/<(.+)>/)?.[1] || ''}</div>
+                  </div>
+                  <div style={{ color: 'var(--text-dim)', fontSize: 12, whiteSpace: 'nowrap' as const }}>{new Date(email.date).toLocaleDateString()}</div>
+                </div>
+                <div style={{ marginTop: 14, fontFamily: 'Syne, sans-serif', fontSize: 20, fontWeight: 700, lineHeight: 1.3, color: 'var(--text)' }}>{email.subject}</div>
+                <div style={{ marginTop: 8, color: 'var(--text-muted)', lineHeight: 1.7, fontSize: 14 }}>{email.summary}</div>
+                <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', gap: 10, color: 'var(--text-dim)', fontSize: 13 }}>
+                  <span>{new Date(email.date).toLocaleDateString()}</span>
+                  <span style={{ color: 'var(--blue)', fontWeight: 600 }}>Open original →</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </main>
+
+      {/* Floating chat */}
+      <div style={{ position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)', width: 'min(680px, calc(100vw - 48px))', display: 'flex', flexDirection: 'column', gap: 10, zIndex: 200, pointerEvents: 'none' }}>
+
+        {/* Response panel */}
+        {panelVisible && (
+          <div style={{ pointerEvents: 'all', background: 'rgba(14,20,32,0.96)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, backdropFilter: 'blur(24px)', boxShadow: '0 20px 60px rgba(0,0,0,0.7)', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px 10px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--accent)' }}>✦ AI Response</span>
+              <button onClick={() => { setPanelVisible(false); setChatMessages([]) }}
+                style={{ width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+            </div>
+            <div style={{ padding: '16px 18px 18px', maxHeight: 300, overflowY: 'auto' }}>
+              {chatLoading && (
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '8px 0' }}>
+                  {[0, 0.2, 0.4].map((d, i) => (
+                    <span key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', display: 'block', animation: `chatdot 1.2s ${d}s ease-in-out infinite` }} />
+                  ))}
+                </div>
+              )}
+              {chatMessages.filter(m => m.role === 'assistant').slice(-1).map((msg, i) => (
+                <p key={i} style={{ fontSize: 14, color: '#c8d0e8', lineHeight: 1.75, whiteSpace: 'pre-line' as const, margin: 0 }}>{msg.content}</p>
+              ))}
+              <div ref={chatEndRef} />
+            </div>
+          </div>
+        )}
+
+        {/* Search bar */}
+        <form onSubmit={sendChat}
+          style={{ pointerEvents: 'all', display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(20,26,40,0.92)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: '12px 16px', backdropFilter: 'blur(24px)', boxShadow: '0 8px 40px rgba(0,0,0,0.6)' }}>
+          <span style={{ fontSize: 14, color: 'var(--accent)', flexShrink: 0 }}>✦</span>
+          <input
+            ref={inputRef}
+            type="text"
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            placeholder={`Ask anything about your ${category} emails…`}
+            disabled={chatLoading}
+            style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'var(--text)', fontFamily: 'DM Sans, sans-serif', fontSize: 14 }}
+          />
+          <button type="submit" disabled={!chatInput.trim() || chatLoading}
+            style={{ flexShrink: 0, width: 32, height: 32, borderRadius: '50%', border: 'none', background: chatInput.trim() && !chatLoading ? 'var(--accent)' : 'var(--surface-3)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: chatInput.trim() && !chatLoading ? 'pointer' : 'not-allowed', transition: 'all 0.2s ease' }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M8 3L13 8L8 13M3 8H13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        </form>
       </div>
     </div>
   )
